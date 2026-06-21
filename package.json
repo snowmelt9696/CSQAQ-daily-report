@@ -1,0 +1,12 @@
+{
+  "name": "csqaq-daily-report",
+  "version": "1.0.0",
+  "description": "Daily CSQAQ Kilowatt Case data scraper and email reporter",
+  "private": true,
+  "scripts": {
+    "scrape": "node scripts/scrape.js"
+  },
+  "dependencies": {
+    "playwright": "^1.61.0"
+  }
+}

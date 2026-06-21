@@ -1,0 +1,64 @@
+name: CSQAQ Daily Report
+
+on:
+  schedule:
+    # UTC 01:00 = 北京时间 09:00
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    # Manual trigger
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers (Chromium only)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run scraper
+        run: node scripts/scrape.js
+        timeout-minutes: 3
+
+      - name: Upload scraped data (artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: goods-data
+          path: data/goods_data.json
+          retention-days: 7
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: pip install jinja2
+
+      - name: Send email report
+        env:
+          QQ_EMAIL: ${{ secrets.QQ_EMAIL }}
+          QQ_AUTH_CODE: ${{ secrets.QQ_AUTH_CODE }}
+          RECIPIENT_EMAIL: ${{ secrets.RECIPIENT_EMAIL }}
+        run: python scripts/send_mail.py
+
+      - name: Report status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "::notice::Daily report sent successfully!"
+          else
+            echo "::error::Daily report failed. Check logs above."
+          fi
