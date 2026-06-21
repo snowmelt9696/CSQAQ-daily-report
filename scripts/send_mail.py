@@ -9,6 +9,7 @@ import os
 import sys
 import smtplib
 from email.mime.text import MIMEText
+from email.utils import formataddr
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -314,7 +315,7 @@ def send_email(html_content, subject):
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = f"CSQAQ日报 <{sender_email}>"
+    msg["From"] = formataddr(("CSQAQ日报", sender_email))
     msg["To"] = recipient_email
 
     msg.attach(MIMEText(html_content, "html", "utf-8"))
