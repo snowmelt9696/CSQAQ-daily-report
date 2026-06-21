@@ -30,18 +30,17 @@ def load_all_data():
     results = []
     for f in files:
         with open(f, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-            results.append(data)
+            results.append(json.load(fh))
     return results
 
 
-def format_price(value):
+def fmt_price(value):
     if value is None:
         return "-"
     return f"¥{value:.2f}"
 
 
-def format_volume(value):
+def fmt_vol(value):
     if value is None or value == 0:
         return "-"
     if value >= 10000:
@@ -49,7 +48,7 @@ def format_volume(value):
     return str(value)
 
 
-def format_change(value):
+def fmt_change(value):
     if value is None:
         return "-"
     if value > 0:
@@ -59,7 +58,18 @@ def format_change(value):
     return "0.00%"
 
 
-def change_class(value):
+def fmt_amt(value):
+    """Format price change amount."""
+    if value is None:
+        return "-"
+    if value > 0:
+        return f"+¥{value:.2f}"
+    elif value < 0:
+        return f"-¥{abs(value):.2f}"
+    return "¥0.00"
+
+
+def cls(value):
     if value is None:
         return "neutral"
     if value > 0:
@@ -81,14 +91,19 @@ def generate_item_section(data):
     img_url = info.get("img", "")
     rank = info.get("rank_num", "-")
     rank_change = info.get("rank_num_change", 0) or 0
-    updated_at = info.get("updated_at", "")
+
+    # Current state
+    cur_price = info.get("buff_sell_price")
+    cur_buy = info.get("buff_buy_price")
+    day_rate = info.get("sell_price_rate_1")
+    day_amt = info.get("sell_price_1")
 
     # Ranking
     rank_str = f"#{rank}" if rank else "-"
     rank_delta = ""
-    if rank_change > 0:
+    if rank_change and rank_change > 0:
         rank_delta = f' <span style="color:#e74c3c;">↑{rank_change}</span>'
-    elif rank_change < 0:
+    elif rank_change and rank_change < 0:
         rank_delta = f' <span style="color:#27ae60;">↓{abs(rank_change)}</span>'
 
     # Image
@@ -96,138 +111,187 @@ def generate_item_section(data):
     if img_url:
         img_tag = f'<img src="{img_url}" alt="{name}" style="width:64px;height:64px;border-radius:6px;margin-right:16px;float:left;">'
 
+    # Platform comparison rows
+    platforms = [
+        ("BUFF", "buff"),
+        ("悠悠有品", "yyyp"),
+        ("Steam", "steam"),
+        ("C5", "c5"),
+        ("IGXE", "igxe"),
+        ("ECO", "eco"),
+    ]
+    plat_rows = ""
+    for plat_name, key in platforms:
+        sell = fmt_price(info.get(f"{key}_sell_price"))
+        buy = fmt_price(info.get(f"{key}_buy_price"))
+        sell_num = fmt_vol(info.get(f"{key}_sell_num"))
+        buy_num = fmt_vol(info.get(f"{key}_buy_num"))
+        plat_rows += f"""
+            <tr>
+              <td>{plat_name}</td>
+              <td class="price-col">{sell}</td>
+              <td class="price-col">{buy}</td>
+              <td>{sell_num}</td>
+              <td>{buy_num}</td>
+            </tr>"""
+
+    # Price trend rows
+    periods = [
+        ("24h", "1"),
+        ("7 天", "7"),
+        ("15 天", "15"),
+        ("30 天", "30"),
+        ("90 天", "90"),
+        ("180 天", "180"),
+        ("365 天", "365"),
+    ]
+    trend_rows = ""
+    for label, suffix in periods:
+        amt = info.get(f"sell_price_{suffix}")
+        rate = info.get(f"sell_price_rate_{suffix}")
+        trend_rows += f"""
+            <tr>
+              <td>{label}</td>
+              <td class="{cls(amt)}">{fmt_amt(amt)}</td>
+              <td class="{cls(rate)}">{fmt_change(rate)}</td>
+            </tr>"""
+
+    # Build historical prices (current + change)
+    hist_7 = cur_price - (info.get("sell_price_7") or 0) if cur_price is not None else None
+    hist_30 = cur_price - (info.get("sell_price_30") or 0) if cur_price is not None else None
+    hist_90 = cur_price - (info.get("sell_price_90") or 0) if cur_price is not None else None
+    hist_365 = cur_price - (info.get("sell_price_365") or 0) if cur_price is not None else None
+
+    # Conversion rates
+    conv_rows = ""
+    conv_pairs = [
+        ("Steam→Buff 售价折价", "steam_buff_sell_conversion"),
+        ("Steam→Buff 求购折价", "steam_buff_buy_conversion"),
+        ("Buff→Steam 售价折价", "buff_steam_sell_conversion"),
+        ("Buff→Steam 求购折价", "buff_steam_buy_conversion"),
+    ]
+    for clabel, ckey in conv_pairs:
+        val = info.get(ckey)
+        if val is not None:
+            conv_rows += f"""
+            <div class="info-item">
+              <div class="label">{clabel}</div>
+              <div class="value">{val}</div>
+            </div>"""
+
     section = f"""
-    <!-- {name} Section -->
+    <!-- {name} -->
     <div class="item-section">
       <div class="item-header">
         <table style="margin:0;width:100%;"><tr>
           <td style="width:80px;border:none;padding:0;">{img_tag}</td>
           <td style="border:none;padding:0;vertical-align:middle;">
             <div class="item-name">{name}</div>
-            <div style="font-size:12px;color:#888;">{market_hash}</div>
-            <div style="font-size:12px;color:#666;margin-top:4px;">
-              {type_name} · {rarity} · 排名 {rank_str}{rank_delta}
-            </div>
+            <div style="font-size:12px;color:#888;">{market_hash} · {type_name} · {rarity}</div>
+            <div style="font-size:12px;color:#666;margin-top:2px;">排名 {rank_str}{rank_delta}</div>
           </td>
           <td style="border:none;text-align:right;vertical-align:middle;">
-            <div style="font-size:12px;color:#aaa;">数据更新</div>
-            <div style="font-size:13px;color:#555;">{updated_at}</div>
+            <div style="font-size:22px;font-weight:700;color:#1a1a2e;">{fmt_price(cur_price)}</div>
+            <div class="{cls(day_rate)}" style="font-size:14px;font-weight:600;">{fmt_change(day_rate)}</div>
           </td>
         </tr></table>
       </div>
 
       <div class="item-body">
-        <!-- Price Overview -->
+        <!-- Quick Stats -->
         <div class="price-grid">
           <div class="price-card">
-            <div class="label">当前售价</div>
-            <div class="value">{format_price(info.get("sell_price"))}</div>
+            <div class="label">BUFF 售价</div>
+            <div class="value">{fmt_price(cur_price)}</div>
           </div>
           <div class="price-card">
-            <div class="label">当前求购</div>
-            <div class="value">{format_price(info.get("buy_price"))}</div>
+            <div class="label">BUFF 求购</div>
+            <div class="value">{fmt_price(cur_buy)}</div>
           </div>
           <div class="price-card">
-            <div class="label">24h 成交量</div>
-            <div class="value">{format_volume(info.get("day_sell_num"))}</div>
+            <div class="label">BUFF 在售</div>
+            <div class="value">{fmt_vol(info.get("buff_sell_num"))}</div>
           </div>
           <div class="price-card">
             <div class="label">24h 涨跌</div>
-            <div class="value {change_class(info.get("sell_price_rate"))}">{format_change(info.get("sell_price_rate"))}</div>
+            <div class="value {cls(day_rate)}">{fmt_change(day_rate)}</div>
           </div>
         </div>
 
         <!-- Platform Comparison -->
         <div class="section-title">📊 平台对比</div>
         <table>
-          <thead>
-            <tr><th>平台</th><th>售价</th><th>求购</th><th>成交量</th><th>在售数</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>BUFF</td>
-              <td>{format_price(info.get("buff_sell_price"))}</td>
-              <td>{format_price(info.get("buff_buy_price"))}</td>
-              <td>{format_volume(info.get("buff_day_sell_num"))}</td>
-              <td>{info.get("buff_on_sale_num", "-")}</td>
-            </tr>
-            <tr>
-              <td>Steam</td>
-              <td>{format_price(info.get("steam_sell_price"))}</td>
-              <td>{format_price(info.get("steam_buy_price"))}</td>
-              <td>{format_volume(info.get("steam_day_sell_num") or info.get("steam_sell_num"))}</td>
-              <td>{info.get("steam_on_sale_num", "-")}</td>
-            </tr>
-            <tr>
-              <td>UUYP</td>
-              <td>{format_price(info.get("uuyp_sell_price"))}</td>
-              <td>{format_price(info.get("uuyp_buy_price"))}</td>
-              <td>{format_volume(info.get("uuyp_day_sell_num"))}</td>
-              <td>{info.get("uuyp_on_sale_num", "-")}</td>
-            </tr>
-            <tr>
-              <td>C5</td>
-              <td>{format_price(info.get("c5_sell_price"))}</td>
-              <td>{format_price(info.get("c5_buy_price"))}</td>
-              <td>{format_volume(info.get("c5_day_sell_num"))}</td>
-              <td>{info.get("c5_on_sale_num", "-")}</td>
-            </tr>
-            <tr>
-              <td>IGXE</td>
-              <td>{format_price(info.get("igxe_sell_price"))}</td>
-              <td>{format_price(info.get("igxe_buy_price"))}</td>
-              <td>{format_volume(info.get("igxe_day_sell_num"))}</td>
-              <td>{info.get("igxe_on_sale_num", "-")}</td>
-            </tr>
-            <tr>
-              <td>YouPin</td>
-              <td>{format_price(info.get("yp_sell_price"))}</td>
-              <td>{format_price(info.get("yp_buy_price"))}</td>
-              <td>{format_volume(info.get("yp_day_sell_num"))}</td>
-              <td>{info.get("yp_on_sale_num", "-")}</td>
-            </tr>
-          </tbody>
+          <thead><tr><th>平台</th><th>售价</th><th>求购</th><th>在售数</th><th>求购数</th></tr></thead>
+          <tbody>{plat_rows}</tbody>
         </table>
 
         <!-- Price Trend -->
-        <div class="section-title">📈 价格趋势</div>
+        <div class="section-title">📈 价格趋势（相对当前）</div>
         <table>
-          <thead>
-            <tr><th>周期</th><th>售价</th><th>涨跌幅</th><th>周期</th><th>售价</th><th>涨跌幅</th></tr>
-          </thead>
+          <thead><tr><th>周期</th><th>涨跌金额</th><th>涨跌幅</th><th>周期</th><th>涨跌金额</th><th>涨跌幅</th></tr></thead>
           <tbody>
             <tr>
               <td>24h</td>
-              <td class="{change_class(info.get("sell_price_rate"))}">{format_price(info.get("sell_price"))}</td>
-              <td class="{change_class(info.get("sell_price_rate"))}">{format_change(info.get("sell_price_rate"))}</td>
+              <td class="{cls(day_amt)}">{fmt_amt(day_amt)}</td>
+              <td class="{cls(day_rate)}">{fmt_change(day_rate)}</td>
               <td>7 天</td>
-              <td class="{change_class(info.get("sell_price_7"))}">{format_price(info.get("sell_price_7"))}</td>
-              <td class="{change_class(info.get("sell_price_rate_7"))}">{format_change(info.get("sell_price_rate_7"))}</td>
+              <td class="{cls(info.get('sell_price_7'))}">{fmt_amt(info.get('sell_price_7'))}</td>
+              <td class="{cls(info.get('sell_price_rate_7'))}">{fmt_change(info.get('sell_price_rate_7'))}</td>
             </tr>
             <tr>
               <td>15 天</td>
-              <td class="{change_class(info.get("sell_price_15"))}">{format_price(info.get("sell_price_15"))}</td>
-              <td class="{change_class(info.get("sell_price_rate_15"))}">{format_change(info.get("sell_price_rate_15"))}</td>
+              <td class="{cls(info.get('sell_price_15'))}">{fmt_amt(info.get('sell_price_15'))}</td>
+              <td class="{cls(info.get('sell_price_rate_15'))}">{fmt_change(info.get('sell_price_rate_15'))}</td>
               <td>30 天</td>
-              <td class="{change_class(info.get("sell_price_30"))}">{format_price(info.get("sell_price_30"))}</td>
-              <td class="{change_class(info.get("sell_price_rate_30"))}">{format_change(info.get("sell_price_rate_30"))}</td>
+              <td class="{cls(info.get('sell_price_30'))}">{fmt_amt(info.get('sell_price_30'))}</td>
+              <td class="{cls(info.get('sell_price_rate_30'))}">{fmt_change(info.get('sell_price_rate_30'))}</td>
             </tr>
             <tr>
               <td>90 天</td>
-              <td class="{change_class(info.get("sell_price_90"))}">{format_price(info.get("sell_price_90"))}</td>
-              <td class="{change_class(info.get("sell_price_rate_90"))}">{format_change(info.get("sell_price_rate_90"))}</td>
+              <td class="{cls(info.get('sell_price_90'))}">{fmt_amt(info.get('sell_price_90'))}</td>
+              <td class="{cls(info.get('sell_price_rate_90'))}">{fmt_change(info.get('sell_price_rate_90'))}</td>
               <td>180 天</td>
-              <td class="{change_class(info.get("sell_price_180"))}">{format_price(info.get("sell_price_180"))}</td>
-              <td class="{change_class(info.get("sell_price_rate_180"))}">{format_change(info.get("sell_price_rate_180"))}</td>
+              <td class="{cls(info.get('sell_price_180'))}">{fmt_amt(info.get('sell_price_180'))}</td>
+              <td class="{cls(info.get('sell_price_rate_180'))}">{fmt_change(info.get('sell_price_rate_180'))}</td>
             </tr>
             <tr>
               <td>365 天</td>
-              <td class="{change_class(info.get("sell_price_365"))}">{format_price(info.get("sell_price_365"))}</td>
-              <td class="{change_class(info.get("sell_price_rate_365"))}">{format_change(info.get("sell_price_rate_365"))}</td>
+              <td class="{cls(info.get('sell_price_365'))}">{fmt_amt(info.get('sell_price_365'))}</td>
+              <td class="{cls(info.get('sell_price_rate_365'))}">{fmt_change(info.get('sell_price_rate_365'))}</td>
               <td></td><td></td><td></td>
             </tr>
           </tbody>
         </table>
+
+        <!-- Historical Prices -->
+        <div class="section-title">📅 历史价格估算</div>
+        <div class="price-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr;">
+          <div class="price-card">
+            <div class="label">当前</div>
+            <div class="value">{fmt_price(cur_price)}</div>
+          </div>
+          <div class="price-card">
+            <div class="label">7 天前</div>
+            <div class="value">{fmt_price(hist_7)}</div>
+          </div>
+          <div class="price-card">
+            <div class="label">30 天前</div>
+            <div class="value">{fmt_price(hist_30)}</div>
+          </div>
+          <div class="price-card">
+            <div class="label">90 天前</div>
+            <div class="value">{fmt_price(hist_90)}</div>
+          </div>
+          <div class="price-card">
+            <div class="label">365 天前</div>
+            <div class="value">{fmt_price(hist_365)}</div>
+          </div>
+        </div>
+
+        <!-- Steam/Buff Conversion -->
+        <div class="section-title">🔄 Steam ↔ Buff 折价率</div>
+        <div class="info-grid">{conv_rows}</div>
+
       </div>
     </div>
     """
@@ -241,13 +305,12 @@ def generate_summary_table(all_data):
         info = data.get("goods_info", {})
         goods_id = data.get("goods_id", "-")
         name = info.get("name", "N/A")
-        sell_price = format_price(info.get("sell_price"))
-        buy_price = format_price(info.get("buy_price"))
-        day_vol = format_volume(info.get("day_sell_num"))
-        rate = info.get("sell_price_rate")
+        price = fmt_price(info.get("buff_sell_price"))
+        buy = fmt_price(info.get("buff_buy_price"))
+        vol = fmt_vol(info.get("buff_sell_num"))
+        rate = info.get("sell_price_rate_1")
         rank = info.get("rank_num", "-")
 
-        rate_html = f'<span class="{change_class(rate)}">{format_change(rate)}</span>'
         img = info.get("img", "")
         img_tag = f'<img src="{img}" style="width:32px;height:32px;vertical-align:middle;margin-right:6px;border-radius:4px;">' if img else ""
 
@@ -255,10 +318,10 @@ def generate_summary_table(all_data):
             <tr>
               <td style="text-align:center;">{goods_id}</td>
               <td>{img_tag} {name}</td>
-              <td class="price-col">{sell_price}</td>
-              <td class="price-col">{buy_price}</td>
-              <td class="{change_class(rate)}">{rate_html}</td>
-              <td>{day_vol}</td>
+              <td class="price-col">{price}</td>
+              <td class="price-col">{buy}</td>
+              <td class="{cls(rate)}">{fmt_change(rate)}</td>
+              <td style="text-align:center;">{vol}</td>
               <td style="text-align:center;">#{rank}</td>
             </tr>"""
 
@@ -267,7 +330,7 @@ def generate_summary_table(all_data):
       <div class="section-title">📋 概览</div>
       <table>
         <thead>
-          <tr><th style="width:50px;">ID</th><th>名称</th><th>售价</th><th>求购</th><th>24h 涨跌</th><th>成交量</th><th>排名</th></tr>
+          <tr><th style="width:50px;">ID</th><th>名称</th><th>售价</th><th>求购</th><th>24h 涨跌</th><th>在售数</th><th>排名</th></tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>
@@ -281,14 +344,11 @@ def generate_html(all_data):
     date_str = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
 
     item_count = len(all_data)
-    item_names = [d.get("goods_info", {}).get("name", "?") for d in all_data]
 
-    # Build item sections
     item_sections = ""
     for data in all_data:
         item_sections += generate_item_section(data)
 
-    # Build summary
     summary_table = generate_summary_table(all_data)
 
     html = f"""<!DOCTYPE html>
@@ -312,6 +372,10 @@ def generate_html(all_data):
   .price-card {{ background: #f8f9fb; border-radius: 8px; padding: 10px 14px; text-align: center; }}
   .price-card .label {{ font-size: 11px; color: #888; margin-bottom: 4px; }}
   .price-card .value {{ font-size: 16px; font-weight: 700; color: #1a1a2e; }}
+  .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }}
+  .info-item {{ background: #f8f9fb; border-radius: 8px; padding: 10px 14px; }}
+  .info-item .label {{ font-size: 11px; color: #888; margin-bottom: 2px; }}
+  .info-item .value {{ font-size: 15px; font-weight: 600; color: #1a1a2e; }}
   .section-title {{ font-size: 15px; font-weight: 700; color: #1a1a2e; margin: 18px 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #0f3460; }}
   table {{ width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }}
   th {{ background: #1a1a2e; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }}
@@ -351,7 +415,6 @@ def generate_html(all_data):
 
 
 def send_email(html_content, subject):
-    """Send email via QQ SMTP."""
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.qq.com")
     smtp_port = int(os.environ.get("SMTP_PORT", "465"))
     sender_email = os.environ.get("QQ_EMAIL")
@@ -369,7 +432,6 @@ def send_email(html_content, subject):
     msg["Subject"] = subject
     msg["From"] = formataddr(("CSQAQ日报", sender_email))
     msg["To"] = recipient_email
-
     msg.attach(MIMEText(html_content, "html", "utf-8"))
 
     print(f"Sending email to {recipient_email} via {smtp_server}:{smtp_port}...")
@@ -384,10 +446,9 @@ def send_email(html_content, subject):
                 server.starttls()
                 server.login(sender_email, sender_password)
                 server.sendmail(sender_email, recipient_email, msg.as_string())
-
         print("Email sent successfully!")
     except smtplib.SMTPAuthenticationError:
-        print("ERROR: SMTP authentication failed. Check QQ_EMAIL and QQ_AUTH_CODE.")
+        print("ERROR: SMTP authentication failed.")
         sys.exit(1)
     except Exception as e:
         print(f"ERROR sending email: {e}")
@@ -402,9 +463,10 @@ def main():
     item_names = [d.get("goods_info", {}).get("name", "?") for d in all_data]
     date_str = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
 
-    subject = f"📊 CSQAQ 行情日报 - {date_str} ({len(all_data)}件)"
     if len(all_data) <= 3:
         subject = f"📊 {'、'.join(item_names)} 行情 - {date_str}"
+    else:
+        subject = f"📊 CSQAQ 行情日报 - {date_str} ({len(all_data)}件)"
 
     print(f"Generating HTML email for: {', '.join(item_names)}")
     html = generate_html(all_data)
