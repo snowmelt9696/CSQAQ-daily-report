@@ -125,10 +125,8 @@ def generate_item_section(data):
     s += "<div class=\"st\">📊 平台对比</div><div class=\"pg2\">" + pcs + "</div>"
     s += "<div class=\"st\">📈 价格趋势</div><div class=\"tw\"><table class=\"tt\"><thead><tr><th>周期</th><th>涨跌金额</th><th>涨跌幅</th></tr></thead><tbody>" + trs + "</tbody></table></div>"
     # Steam/Buff conversion
-    cv = ""
-    for clb, ck in [("Steam→Buff 售", "steam_buff_sell_conversion"), ("Steam→Buff 购", "steam_buff_buy_conversion"), ("Buff→Steam 售", "buff_steam_sell_conversion"), ("Buff→Steam 购", "buff_steam_buy_conversion")]:
-        cv += "<td><div class=\"lbl\">" + clb + "</div><div class=\"val\">" + str(i.get(ck, "-")) + "</div></td>"
-    s += "<div class=\"st\">🔄 Steam ↔ Buff 折价率</div><table class=\"ct\"><tr>" + cv + "</tr></table>"
+    cv1 = str(i.get("steam_buff_buy_conversion", "-")); cv2 = str(i.get("buff_steam_sell_conversion", "-"))
+    s += "<div class=\"st\">🔄 Steam挂刀参考</div><table class=\"ct\"><tr><td><div class=\"lbl\">Steam求购挂刀</div><div class=\"val\">" + cv1 + "</div></td><td><div class=\"lbl\">Steam在售挂刀</div><div class=\"val\">" + cv2 + "</div></td></tr></table>"
     s += "</div></div>"
     return s
 
