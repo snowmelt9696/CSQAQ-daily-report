@@ -124,6 +124,11 @@ def generate_item_section(data):
     s += "<div class=\"pg\"><div class=\"pcd\"><span>BUFF 售价</span><strong>" + fp(cp) + "</strong></div><div class=\"pcd\"><span>BUFF 求购</span><strong>" + fp(cb) + "</strong></div><div class=\"pcd\"><span>在售数</span><strong>" + fv(i.get("buff_sell_num")) + "</strong></div><div class=\"pcd\"><span>24h 涨跌</span><strong class=\"" + cl(dr) + "\">" + fc(dr) + "</strong></div></div>"
     s += "<div class=\"st\">📊 平台对比</div><div class=\"pg2\">" + pcs + "</div>"
     s += "<div class=\"st\">📈 价格趋势</div><div class=\"tw\"><table class=\"tt\"><thead><tr><th>周期</th><th>涨跌金额</th><th>涨跌幅</th></tr></thead><tbody>" + trs + "</tbody></table></div>"
+    # Steam/Buff conversion
+    cv = ""
+    for clb, ck in [("Steam→Buff 售", "steam_buff_sell_conversion"), ("Steam→Buff 购", "steam_buff_buy_conversion"), ("Buff→Steam 售", "buff_steam_sell_conversion"), ("Buff→Steam 购", "buff_steam_buy_conversion")]:
+        cv += "<div class=\"ici\"><div class=\"lbl\">" + clb + "</div><div class=\"val\">" + str(i.get(ck, "-")) + "</div></div>"
+    s += "<div class=\"st\">🔄 Steam ↔ Buff 折价率</div><div class=\"ic\">" + cv + "</div>"
     s += "</div></div>"
     return s
 
