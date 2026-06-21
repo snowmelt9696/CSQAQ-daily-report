@@ -1,26 +1,23 @@
 /**
- * CSQAQ Kilowatt Case Data Scraper
- * Uses Playwright to extract goods data from csqaq.com
- * Saves results to data/goods_data.json
+ * CSQAQ Multi-Goods Data Scraper
+ * Uses Playwright to extract goods data from csqaq.com for multiple items.
+ * Set GOODS_IDS env var (comma-separated) to target specific items.
+ * Saves individual results to data/goods_{id}.json and manifest to data/manifest.json.
  */
 
 const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
 
-const GOODS_ID = 19521;
-const PAGE_URL = `https://csqaq.com/goods/${GOODS_ID}`;
-const API_URL = `https://csqaq.com/proxies/api/v1/info/good?id=${GOODS_ID}`;
+const GOODS_IDS = (process.env.GOODS_IDS || "19521")
+  .split(",")
+  .map((id) => id.trim())
+  .filter(Boolean);
+
 const OUTPUT_DIR = path.join(__dirname, "..", "data");
-const OUTPUT_FILE = path.join(OUTPUT_DIR, "goods_data.json");
 
-async function scrape() {
-  console.log(`[${new Date().toISOString()}] Launching browser...`);
-
-  const browser = await chromium.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+async function scrapeGoods(browser, goodsId) {
+  const pageUrl = `https://csqaq.com/goods/${goodsId}`;
 
   const context = await browser.newContext({
     userAgent:
@@ -29,19 +26,18 @@ async function scrape() {
 
   const page = await context.newPage();
 
-  // Collect API responses
   let goodsData = null;
   let chartData = null;
 
   page.on("response", async (response) => {
     const url = response.url();
     try {
-      if (url.includes("/proxies/api/v1/info/good?id=")) {
+      if (url.includes(`/proxies/api/v1/info/good?id=${goodsId}`)) {
         const body = await response.text();
         const json = JSON.parse(body);
         if (json.code === 200) {
           goodsData = json.data;
-          console.log(`  -> Captured goods data`);
+          console.log(`  -> Captured goods data for ID ${goodsId}`);
         }
       }
       if (url.includes("/proxies/api/v1/info/chart")) {
@@ -49,7 +45,7 @@ async function scrape() {
         const json = JSON.parse(body);
         if (json.code === 200) {
           chartData = json.data;
-          console.log(`  -> Captured chart data`);
+          console.log(`  -> Captured chart data for ID ${goodsId}`);
         }
       }
     } catch (e) {
@@ -57,26 +53,23 @@ async function scrape() {
     }
   });
 
-  console.log(`Navigating to ${PAGE_URL}...`);
-  await page.goto(PAGE_URL, {
+  console.log(`  Navigating to ${pageUrl}...`);
+  await page.goto(pageUrl, {
     waitUntil: "networkidle",
     timeout: 30000,
   });
-
-  // Wait extra time for dynamic API calls to complete
   await page.waitForTimeout(5000);
 
-  await browser.close();
+  await context.close();
 
   if (!goodsData) {
-    console.error("ERROR: Failed to capture goods data from API");
-    process.exit(1);
+    console.error(`  ERROR: Failed to capture goods data for ID ${goodsId}`);
+    return null;
   }
 
-  // Build output
-  const result = {
+  return {
     scraped_at: new Date().toISOString(),
-    goods_id: GOODS_ID,
+    goods_id: goodsId,
     goods_info: goodsData.goods_info,
     container: goodsData.container || [],
     statistic_list: goodsData.statistic_list || [],
@@ -88,21 +81,57 @@ async function scrape() {
         }
       : null,
   };
+}
 
-  // Ensure output directory exists
+async function scrape() {
   if (!fs.existsSync(OUTPUT_DIR)) {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   }
 
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(result, null, 2), "utf-8");
-  console.log(
-    `Data saved to ${OUTPUT_FILE} (${JSON.stringify(result).length} bytes)`
-  );
-  console.log(`Done! Goods: ${result.goods_info.name} (${result.goods_info.market_hash_name})`);
+  console.log(`[${new Date().toISOString()}] Launching browser...`);
+  console.log(`Target goods IDs: ${GOODS_IDS.join(", ")}`);
+
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+
+  const manifest = [];
+
+  for (const goodsId of GOODS_IDS) {
+    console.log(`\n--- Scraping goods ID: ${goodsId} ---`);
+    const data = await scrapeGoods(browser, goodsId);
+
+    if (data) {
+      const filename = `goods_${goodsId}.json`;
+      const filepath = path.join(OUTPUT_DIR, filename);
+      fs.writeFileSync(filepath, JSON.stringify(data, null, 2), "utf-8");
+      console.log(`  Saved to ${filename} (${JSON.stringify(data).length} bytes)`);
+      console.log(`  Goods: ${data.goods_info.name} (${data.goods_info.market_hash_name})`);
+
+      manifest.push({
+        id: goodsId,
+        name: data.goods_info.name,
+        market_hash_name: data.goods_info.market_hash_name,
+        file: filename,
+      });
+    }
+  }
+
+  await browser.close();
+
+  if (manifest.length === 0) {
+    console.error("ERROR: No goods data captured for any ID");
+    process.exit(1);
+  }
+
+  const manifestPath = path.join(OUTPUT_DIR, "manifest.json");
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
+  console.log(`\nManifest saved to manifest.json (${manifest.length} items)`);
+  console.log("Done!");
 }
 
 scrape().catch((err) => {
   console.error("Scrape failed:", err);
   process.exit(1);
 });
-
