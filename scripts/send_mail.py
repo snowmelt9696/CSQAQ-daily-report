@@ -127,8 +127,8 @@ def generate_item_section(data):
     # Steam/Buff conversion
     cv = ""
     for clb, ck in [("Steam→Buff 售", "steam_buff_sell_conversion"), ("Steam→Buff 购", "steam_buff_buy_conversion"), ("Buff→Steam 售", "buff_steam_sell_conversion"), ("Buff→Steam 购", "buff_steam_buy_conversion")]:
-        cv += "<div class=\"ici\"><div class=\"lbl\">" + clb + "</div><div class=\"val\">" + str(i.get(ck, "-")) + "</div></div>"
-    s += "<div class=\"st\">🔄 Steam ↔ Buff 折价率</div><div class=\"ic\">" + cv + "</div>"
+        cv += "<td><div class=\"lbl\">" + clb + "</div><div class=\"val\">" + str(i.get(ck, "-")) + "</div></td>"
+    s += "<div class=\"st\">🔄 Steam ↔ Buff 折价率</div><table class=\"ct\"><tr>" + cv + "</tr></table>"
     s += "</div></div>"
     return s
 
