@@ -109,7 +109,7 @@ def generate_item_section(data):
     # Image
     img_tag = ""
     if img_url:
-        img_tag = f'<img src="{img_url}" alt="{name}" style="width:64px;height:64px;border-radius:6px;margin-right:16px;float:left;">'
+        img_tag = f'<img src="{img_url}" alt="{name}" class="item-img">'
 
     # Platform comparison rows
     platforms = [
@@ -183,15 +183,15 @@ def generate_item_section(data):
     <!-- {name} -->
     <div class="item-section">
       <div class="item-header">
-        <table style="margin:0;width:100%;"><tr>
-          <td style="width:80px;border:none;padding:0;">{img_tag}</td>
-          <td style="border:none;padding:0;vertical-align:middle;">
+        <table class="header-table"><tr>
+          <td class="header-img-cell">{img_tag}</td>
+          <td class="header-info-cell">
             <div class="item-name">{name}</div>
-            <div style="font-size:12px;color:#888;">{market_hash} · {type_name} · {rarity}</div>
-            <div style="font-size:12px;color:#666;margin-top:2px;">排名 {rank_str}{rank_delta}</div>
+            <div class="item-sub">{market_hash} · {type_name} · {rarity}</div>
+            <div class="item-sub">排名 {rank_str}{rank_delta}</div>
           </td>
-          <td style="border:none;text-align:right;vertical-align:middle;">
-            <div style="font-size:22px;font-weight:700;color:#1a1a2e;">{fmt_price(cur_price)}</div>
+          <td class="header-price-cell">
+            <div class="header-price">{fmt_price(cur_price)}</div>
             <div class="{cls(day_rate)}" style="font-size:14px;font-weight:600;">{fmt_change(day_rate)}</div>
           </td>
         </tr></table>
@@ -220,6 +220,7 @@ def generate_item_section(data):
 
         <!-- Platform Comparison -->
         <div class="section-title">📊 平台对比</div>
+                <div class="table-wrap">
         <table>
           <thead><tr><th>平台</th><th>售价</th><th>求购</th><th>在售数</th><th>求购数</th></tr></thead>
           <tbody>{plat_rows}</tbody>
@@ -227,6 +228,7 @@ def generate_item_section(data):
 
         <!-- Price Trend -->
         <div class="section-title">📈 价格趋势（相对当前）</div>
+                <div class="table-wrap">
         <table>
           <thead><tr><th>周期</th><th>涨跌金额</th><th>涨跌幅</th><th>周期</th><th>涨跌金额</th><th>涨跌幅</th></tr></thead>
           <tbody>
@@ -312,7 +314,7 @@ def generate_summary_table(all_data):
         rank = info.get("rank_num", "-")
 
         img = info.get("img", "")
-        img_tag = f'<img src="{img}" style="width:32px;height:32px;vertical-align:middle;margin-right:6px;border-radius:4px;">' if img else ""
+        img_tag = f'<img src="{img}" class="summary-img">' if img else ""
 
         rows += f"""
             <tr>
@@ -328,6 +330,7 @@ def generate_summary_table(all_data):
     return f"""
     <div class="summary-section">
       <div class="section-title">📋 概览</div>
+      <div class="table-wrap">
       <table>
         <thead>
           <tr><th style="width:50px;">ID</th><th>名称</th><th>售价</th><th>求购</th><th>24h 涨跌</th><th>在售数</th><th>排名</th></tr>
@@ -355,44 +358,76 @@ def generate_html(all_data):
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta name="x-apple-disable-message-reformatting">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body {{ font-family: 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 0; color: #333; }}
-  .container {{ max-width: 720px; margin: 20px auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }}
-  .header {{ background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); color: #fff; padding: 28px 32px; text-align: center; }}
-  .header h1 {{ margin: 0 0 6px 0; font-size: 22px; font-weight: 700; }}
-  .header .subtitle {{ font-size: 13px; opacity: 0.85; }}
-  .body {{ padding: 20px 28px; }}
-  .summary-section {{ margin-bottom: 20px; }}
-  .item-section {{ border: 1px solid #e8ecf1; border-radius: 10px; margin-bottom: 20px; overflow: hidden; }}
-  .item-header {{ background: #f8f9fb; padding: 14px 18px; border-bottom: 1px solid #e8ecf1; }}
-  .item-name {{ font-size: 17px; font-weight: 700; color: #1a1a2e; }}
-  .item-body {{ padding: 16px 18px; }}
-  .price-grid {{ display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }}
-  .price-card {{ background: #f8f9fb; border-radius: 8px; padding: 10px 14px; text-align: center; }}
-  .price-card .label {{ font-size: 11px; color: #888; margin-bottom: 4px; }}
-  .price-card .value {{ font-size: 16px; font-weight: 700; color: #1a1a2e; }}
-  .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }}
-  .info-item {{ background: #f8f9fb; border-radius: 8px; padding: 10px 14px; }}
-  .info-item .label {{ font-size: 11px; color: #888; margin-bottom: 2px; }}
-  .info-item .value {{ font-size: 15px; font-weight: 600; color: #1a1a2e; }}
-  .section-title {{ font-size: 15px; font-weight: 700; color: #1a1a2e; margin: 18px 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #0f3460; }}
-  table {{ width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }}
-  th {{ background: #1a1a2e; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }}
-  th:first-child {{ border-radius: 6px 0 0 0; }}
-  th:last-child {{ border-radius: 0 6px 0 0; }}
-  td {{ padding: 8px 10px; border-bottom: 1px solid #eef0f4; }}
-  tr:hover td {{ background: #f8f9fb; }}
-  .up {{ color: #e74c3c; font-weight: 600; }}
-  .down {{ color: #27ae60; font-weight: 600; }}
-  .neutral {{ color: #888; }}
-  .price-col {{ font-family: 'Consolas', 'Courier New', monospace; }}
-  .footer {{ background: #f8f9fb; padding: 16px 28px; text-align: center; font-size: 11px; color: #aaa; }}
-  .footer a {{ color: #0f3460; text-decoration: none; }}
-  @media (max-width: 600px) {{
-    .price-grid {{ grid-template-columns: 1fr 1fr; }}
-    .body {{ padding: 12px 14px; }}
+
+  body {{ font-family: 'Microsoft YaHei','PingFang SC','Hiragino Sans GB',Arial,sans-serif; background:#f4f6f9; margin:0; padding:0; color:#333; -webkit-text-size-adjust:100%; }}
+  .container {{ max-width:720px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 2px 12px rgba(0,0,0,0.08); overflow:hidden; }}
+  .header {{ background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460); color:#fff; padding:24px 20px; text-align:center; }}
+  .header h1 {{ margin:0 0 4px; font-size:20px; font-weight:700; }}
+  .header .subtitle {{ font-size:12px; opacity:0.85; }}
+  .body {{ padding:16px; }}
+  .summary-section {{ margin-bottom:16px; }}
+  .section-title {{ font-size:14px; font-weight:700; color:#1a1a2e; margin:14px 0 8px; padding-bottom:4px; border-bottom:2px solid #0f3460; }}
+  .table-wrap {{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin:6px 0; }}
+  .table-wrap table {{ min-width:480px; }}
+  table {{ width:100%; border-collapse:collapse; margin:6px 0; font-size:12px; }}
+  th {{ background:#1a1a2e; color:#fff; padding:6px 8px; text-align:left; font-weight:600; white-space:nowrap; }}
+  th:first-child {{ border-radius:4px 0 0 0; }}
+  th:last-child {{ border-radius:0 4px 0 0; }}
+  td {{ padding:6px 8px; border-bottom:1px solid #eef0f4; }}
+  tr:hover td {{ background:#f8f9fb; }}
+  .up {{ color:#e74c3c; font-weight:600; }}
+  .down {{ color:#27ae60; font-weight:600; }}
+  .neutral {{ color:#888; }}
+  .price-col {{ font-family:'Consolas','Courier New',monospace; white-space:nowrap; }}
+  .item-section {{ border:1px solid #e8ecf1; border-radius:10px; margin-bottom:16px; overflow:hidden; }}
+  .item-header {{ background:#f8f9fb; padding:10px 14px; border-bottom:1px solid #e8ecf1; }}
+  .header-table {{ margin:0; width:100%; }}
+  .header-table td {{ border:none; padding:4px; }}
+  .header-img-cell {{ width:56px; vertical-align:middle; }}
+  .item-img {{ width:48px; height:48px; border-radius:6px; display:block; }}
+  .header-info-cell {{ vertical-align:middle; }}
+  .item-name {{ font-size:15px; font-weight:700; color:#1a1a2e; }}
+  .item-sub {{ font-size:11px; color:#888; margin-top:1px; }}
+  .header-price-cell {{ text-align:right; vertical-align:middle; white-space:nowrap; }}
+  .header-price {{ font-size:20px; font-weight:700; color:#1a1a2e; }}
+  .header-change {{ font-size:13px; font-weight:600; }}
+  .item-body {{ padding:12px 14px; }}
+  .price-grid {{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; margin-bottom:10px; }}
+  .price-card {{ background:#f8f9fb; border-radius:8px; padding:8px 10px; text-align:center; }}
+  .price-card .label {{ font-size:10px; color:#888; margin-bottom:2px; }}
+  .price-card .value {{ font-size:14px; font-weight:700; color:#1a1a2e; }}
+  .info-grid {{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }}
+  .info-item {{ background:#f8f9fb; border-radius:8px; padding:8px 10px; }}
+  .info-item .label {{ font-size:10px; color:#888; margin-bottom:2px; }}
+  .info-item .value {{ font-size:13px; font-weight:600; color:#1a1a2e; }}
+  .summary-img {{ width:24px; height:24px; vertical-align:middle; margin-right:4px; border-radius:3px; }}
+  .footer {{ background:#f8f9fb; padding:12px 16px; text-align:center; font-size:10px; color:#aaa; }}
+  .footer a {{ color:#0f3460; text-decoration:none; }}
+  @media (max-width:480px) {{
+    .container {{ border-radius:0; }}
+    .header {{ padding:18px 14px; }}
+    .header h1 {{ font-size:17px; }}
+    .body {{ padding:10px; }}
+    .price-grid {{ grid-template-columns:1fr 1fr; gap:6px; }}
+    .hist-grid {{ grid-template-columns:1fr 1fr 1fr; }}
+    .price-card {{ padding:6px 8px; }}
+    .price-card .value {{ font-size:13px; }}
+    .info-grid {{ grid-template-columns:1fr; }}
+    .item-body {{ padding:8px 10px; }}
+    .item-header {{ padding:8px 10px; }}
+    .item-name {{ font-size:14px; }}
+    .header-price {{ font-size:17px; }}
+    .section-title {{ font-size:13px; }}
+    table {{ font-size:11px; }}
+    th,td {{ padding:4px 6px; }}
+    .item-img {{ width:40px; height:40px; }}
+    .header-img-cell {{ width:44px; }}
   }}
+
+
 </style>
 </head>
 <body>
